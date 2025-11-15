@@ -1,0 +1,26 @@
+{
+  "name": "tv-indicator-access",
+  "version": "1.0.0",
+  "description": "A Playwright script to manage access to private TradingView indicators.",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "list": "node index.js --list-only",
+    "refresh-invite-list": "node index.js --refresh-invite-list",
+    "grant": "node index.js --grant",
+    "save-session": "node save-session.js",
+    "install-deps": "npx playwright install --with-deps chromium"
+  },
+  "keywords": [
+    "playwright",
+    "tradingview",
+    "automation"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "playwright": "^1.44.1"
+  }
+}
