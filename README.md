@@ -1,4 +1,4 @@
-# TradingView Invite-Only Access Manager
+# TradingView Invite-Only Access Manager (Deploy)
 
 This package automates granting invite-only access to your TradingView indicators via Playwright. It enumerates your invite-only scripts, lets you curate which ones are managed, and grants/revokes access for users with optional expiration.
 
@@ -84,6 +84,33 @@ Troubleshoot with a visible browser:
 npm run grant -- --headed --users user1 --no-expiry
 ```
 
+## Revoke Access
+
+Remove access for one or more users across the selected scripts (headless by default):
+
+```
+npm run revoke -- --users user1 user2
+```
+
+Revoke for specific scripts by URL or ID (skip enumeration):
+
+```
+npm run revoke -- --users user1 --scripts https://www.tradingview.com/script/mbJMk5vq-Adaptive-SwitchBack/
+
+# Multiple scripts by ID or URL (space- or comma-separated)
+npm run revoke -- --users user1 --scripts mbJMk5vq TfrGq8AP
+```
+
+Troubleshoot with a visible browser:
+
+```
+npm run revoke -- --headed --users user1
+```
+
+Notes
+- Safe if a user has no access: the script logs and continues.
+- `--revoke` cannot be combined with `--grant`.
+
 ## Flags and Behavior
 
 - `--headed` / `--show`
@@ -95,8 +122,10 @@ npm run grant -- --headed --users user1 --no-expiry
   - Requires `--profile-url https://www.tradingview.com/u/<user>/#published-scripts`.
 - `--grant`
   - Perform the grant flow. Used in `npm run grant`.
+- `--revoke`
+  - Remove access for provided users. Used in `npm run revoke`. Cannot be combined with `--grant`.
 - `--users`
-  - One or more TradingView usernames. Accepts space- or comma-separated lists. Required for `--grant`.
+  - One or more TradingView usernames. Accepts space- or comma-separated lists. Required for `--grant` and `--revoke`.
 - `--scripts`
   - Optional scripts to process directly (URLs or IDs); space- or comma-separated. Skips profile enumeration.
 - `--no-expiry` | `--expires YYYY-MM-DD` | `--days N`
@@ -117,13 +146,13 @@ Notes
 ```
 npm run refresh-invite-list -- --profile-url https://www.tradingview.com/u/YourUser/#published-scripts
 # edit script-selection.json -> set enabled: true for a few scripts
-npm run grant -- --users upslidedown --no-expiry
+npm run grant -- --users godzcopilot --no-expiry
 ```
 
 2) Grant to multiple users with a fixed date expiry (headless)
 
 ```
-npm run grant -- --users godzcopilot --expires 2025-12-31
+npm run grant -- --users godzcopilot upslidedown --expires 2025-12-31
 ```
 
 3) Grant directly to a specific script by URL
@@ -136,6 +165,20 @@ npm run grant -- --users godzcopilot --days 30 --scripts https://www.tradingview
 
 ```
 npm run grant -- --headed --users godzcopilot --no-expiry
+```
+
+5) Revoke access for a user across enabled scripts
+
+```
+npm run revoke -- --users godzcopilot
+```
+
+6) Revoke for specific scripts by ID or URL
+
+```
+npm run revoke -- --users godzcopilot --scripts mbJMk5vq TfrGq8AP
+# or by URL
+npm run revoke -- --users godzcopilot --scripts https://www.tradingview.com/script/mbJMk5vq-Adaptive-SwitchBack/
 ```
 
 ## Files
