@@ -20,11 +20,12 @@ function parseArgs(argv) {
       case '--invite-only':
       case '--refresh-invite-list':
       case '--grant':
+      case '--revoke':
       case '--no-expiry':
-      case '--headed':
-      case '--show':
-        out.flags.add(k);
-        break;
+        case '--headed':
+        case '--show':
+          out.flags.add(k);
+          break;
       case '--users':
       case '--scripts': {
         if (val !== undefined) { out.values[k] = val; break; }
@@ -211,6 +212,8 @@ async function grantAccessFromDialog(page, usernames) {
         await page.waitForTimeout(300);
     }
 
+    // Proceed with grant flow (revoke existing, then add with expiry)
+
     for (const username of usernames) {
         console.log(`--- Processing user: ${username} ---`);
         await revokeIfPresent(username);
@@ -304,6 +307,76 @@ async function grantAccessFromDialog(page, usernames) {
             console.warn(`User "${username}" not found in search results. Skipping.`);
         }
         await page.waitForTimeout(600);
+    }
+
+    const closeBtn = dialog.locator('[data-qa-id="close"]');
+    if (await closeBtn.count()) await closeBtn.click();
+    await dialog.waitFor({ state: 'hidden', timeout: 10000 });
+}
+
+// Revoke-only flow: remove users' access without re-granting
+async function revokeAccessFromDialog(page, usernames) {
+    const dialog = page.locator('[data-dialog-name="Manage invite-only access to this script"]');
+    await dialog.waitFor({ state: 'visible', timeout: 10000 });
+
+    // Switch to Access granted tab
+    const gotoAccessGranted = async () => {
+        const accessTabById = dialog.locator('button#Access granted');
+        if (await accessTabById.count()) await accessTabById.click();
+        else {
+            const accessTab = dialog.locator('button:has-text("Access granted")');
+            if (await accessTab.count()) await accessTab.click();
+        }
+        await page.waitForTimeout(400);
+    };
+
+    const revokeOne = async (username) => {
+        await gotoAccessGranted();
+        let grantedRow = dialog.locator(`[data-username="${username}"]`).first();
+        if (!(await grantedRow.count())) {
+            const byText = dialog.getByText(username, { exact: true });
+            if (await byText.count()) grantedRow = byText.first();
+        }
+        if (await grantedRow.count()) {
+            const removeIcon = grantedRow.locator('[data-name="manage-access-dialog-item-remove-button"]').first();
+            try {
+                if (await removeIcon.count()) {
+                    await removeIcon.hover({ timeout: 800 }).catch(() => {});
+                    await removeIcon.click({ timeout: 1500 });
+                } else {
+                    const revokeBtn = grantedRow.locator(':is(button, [role="button"]):has-text("Revoke")').first();
+                    const removeBtn = grantedRow.locator(':is(button, [role="button"]):has-text("Remove")').first();
+                    const revokeText = grantedRow.getByText('Revoke access');
+                    if (await revokeBtn.count()) await revokeBtn.click({ timeout: 1500 });
+                    else if (await removeBtn.count()) await removeBtn.click({ timeout: 1500 });
+                    else if (await revokeText.count()) await revokeText.click({ timeout: 1500 });
+                    else {
+                        await grantedRow.hover({ timeout: 800 }).catch(() => {});
+                        await grantedRow.click({ timeout: 800 }).catch(() => {});
+                        const anyRevoke = dialog.locator(':is(button, [role="button"]):has-text("Revoke"), :is(button, [role="button"]):has-text("Remove")').first();
+                        if (await anyRevoke.count()) await anyRevoke.click({ timeout: 800 });
+                    }
+                }
+            } catch {}
+
+            const confirmDlg = page.locator('[data-dialog-name*="Revoke" i], [data-dialog-name*="Remove" i], [data-dialog-name*="Delete" i]');
+            if (await confirmDlg.count()) {
+                const confirmBtn = confirmDlg.locator(':is(button, [role="button"]):has-text("Revoke"), :is(button, [role="button"]):has-text("Remove"), :is(button, [role="button"]):has-text("Confirm")').first();
+                if (await confirmBtn.count()) await confirmBtn.click();
+                try { await confirmDlg.waitFor({ state: 'hidden', timeout: 5000 }); } catch {}
+            }
+
+            try { await grantedRow.waitFor({ state: 'detached', timeout: 5000 }); } catch {}
+            console.log(`Revoked access for ${username}.`);
+        } else {
+            console.log(`No existing access found for ${username}. Skipping.`);
+        }
+        await page.waitForTimeout(300);
+    };
+
+    for (const username of usernames) {
+        console.log(`--- Revoking user: ${username} ---`);
+        await revokeOne(username);
     }
 
     const closeBtn = dialog.locator('[data-qa-id="close"]');
@@ -453,18 +526,24 @@ async function main() {
     const listOnly = ARGS.has('--list-only');
     const manageAll = ARGS.has('--all');
     const doRefreshInvite = ARGS.has('--refresh-invite-list');
-    const doGrant = ARGS.has('--grant') || (!listOnly && !doRefreshInvite);
+    const doRevoke = ARGS.has('--revoke');
+    const doGrant = ARGS.has('--grant') || (!listOnly && !doRefreshInvite && !doRevoke);
 
     const profileUrl = ARG_VALUES['--profile-url'];
     const usersFromArgs = (ARG_VALUES['--users'] || '').split(',').map(s => s.trim()).filter(Boolean);
 
-    if (doGrant && usersFromArgs.length === 0) {
+    if ((doGrant || doRevoke) && usersFromArgs.length === 0) {
         console.error('No users provided. Use the --users argument to specify one or more TradingView usernames.');
         process.exit(1);
     }
 
+    if (doRevoke && ARGS.has('--grant')) {
+        console.error('Cannot combine --grant and --revoke. Use only one operation.');
+        process.exit(1);
+    }
+
     // Determine which operations require the profile URL.
-    const needsProfileUrl = doRefreshInvite || listOnly || (doGrant && !(await resolveTargetsFromSelectionOrArgs()).length);
+    const needsProfileUrl = doRefreshInvite || listOnly || ((doGrant || doRevoke) && !(await resolveTargetsFromSelectionOrArgs()).length);
     if (needsProfileUrl && !profileUrl) {
         console.error('Missing --profile-url argument. This is required for listing or refreshing scripts from a profile.');
         process.exit(1);
@@ -540,7 +619,11 @@ async function main() {
                     console.warn('Could not open Manage access from script page via known controls.');
                     continue;
                 }
-                await grantAccessFromDialog(page, usersFromArgs);
+                if (doRevoke) {
+                    await revokeAccessFromDialog(page, usersFromArgs);
+                } else if (doGrant) {
+                    await grantAccessFromDialog(page, usersFromArgs);
+                }
             } else {
                 console.warn(`Skipping script without URL: ${t.title}`);
             }
