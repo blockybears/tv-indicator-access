@@ -123,19 +123,19 @@ npm run grant -- --users upslidedown --no-expiry
 2) Grant to multiple users with a fixed date expiry (headless)
 
 ```
-npm run grant -- --users upslidedown Auggie11 --expires 2025-12-31
+npm run grant -- --users godzcopilot --expires 2025-12-31
 ```
 
 3) Grant directly to a specific script by URL
 
 ```
-npm run grant -- --users upslidedown --days 30 --scripts https://www.tradingview.com/script/mbJMk5vq-Adaptive-SwitchBack/
+npm run grant -- --users godzcopilot --days 30 --scripts https://www.tradingview.com/script/mbJMk5vq-Adaptive-SwitchBack/
 ```
 
 4) Troubleshoot with a visible browser
 
 ```
-npm run grant -- --headed --users upslidedown --no-expiry
+npm run grant -- --headed --users godzcopilot --no-expiry
 ```
 
 ## Files
