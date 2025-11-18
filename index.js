@@ -158,6 +158,17 @@ async function grantAccessFromDialog(page, usernames) {
         }
         await page.waitForTimeout(400);
 
+
+        // upslidedown fix here if big count users
+        const usernameElementsCount = await dialog.locator('[data-username]').count();
+        if (usernameElementsCount > 5) {
+            // upslidedown
+            // console.log("Too many users found, adding forced filtered search...");
+            const userSearch = dialog.locator('input[placeholder*="Search through users with access"]');
+            await userSearch.fill(username);
+            await page.waitForTimeout(1800);
+        }            
+
         // Locate granted row by data-username or visible text
         let grantedRow = dialog.locator(`[data-username="${username}"]`).first();
         if (!(await grantedRow.count())) {
@@ -332,7 +343,18 @@ async function revokeAccessFromDialog(page, usernames) {
 
     const revokeOne = async (username) => {
         await gotoAccessGranted();
+
+        const usernameElementsCount = await dialog.locator('[data-username]').count();
+        if (usernameElementsCount > 5) {
+            // upslidedown
+            // console.log("Too many users found, adding forced filtered search...");
+            const userSearch = dialog.locator('input[placeholder*="Search through users with access"]');
+            await userSearch.fill(username);
+            await page.waitForTimeout(1800);
+        }            
+
         let grantedRow = dialog.locator(`[data-username="${username}"]`).first();
+
         if (!(await grantedRow.count())) {
             const byText = dialog.getByText(username, { exact: true });
             if (await byText.count()) grantedRow = byText.first();
